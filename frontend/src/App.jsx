@@ -1,6 +1,19 @@
 import './App.css';
 import { useEffect, useRef, useState } from 'react';
 
+function getDistance(x1, y1, x2, y2) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+function isWithinRange(x1, y1, x2, y2, range = 100) {
+  return getDistance(x1, y1, x2, y2) <= range;
+}
+console.log('Distance test:', getDistance(100, 100, 130, 140));
+console.log('Range test:', isWithinRange(100, 100, 130, 140));
+
 function App() {
   const walls = [
   { x: 200, y: 150, width: 150, height: 15 },
@@ -149,116 +162,181 @@ const localStreamRef = useRef(null);
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
+  // Move avatar using mouse click
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-  // Draw canvas world and avatars
+    const handleCanvasClick = (event) => {
+      const rect = canvas.getBoundingClientRect();
+
+      const targetX = (event.clientX - rect.left) * (canvas.width / rect.width);
+      const targetY = (event.clientY - rect.top) * (canvas.height / rect.height);
+
+      const radius = 12;
+
+      const hitWall = walls.some((wall) => {
+        const closestX = Math.max(
+          wall.x,
+          Math.min(targetX, wall.x + wall.width)
+        );
+        const closestY = Math.max(
+          wall.y,
+          Math.min(targetY, wall.y + wall.height)
+        );
+
+        const dx = targetX - closestX;
+        const dy = targetY - closestY;
+
+        return dx * dx + dy * dy < radius * radius;
+      });
+
+      if (hitWall) return;
+
+      const nextPosition = {
+        x: Math.max(15, Math.min(785, targetX)),
+        y: Math.max(15, Math.min(485, targetY))
+      };
+
+      positionRef.current = nextPosition;
+
+      const id = avatarIdRef.current;
+
+      if (id) {
+        setAvatars((previous) => ({
+          ...previous,
+          [id]: { ...nextPosition }
+        }));
+      }
+
+      const socket = socketRef.current;
+
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({
+          type: 'move',
+          x: nextPosition.x,
+          y: nextPosition.y
+        }));
+      }
+    };
+
+    canvas.addEventListener('click', handleCanvasClick);
+
+    return () => {
+      canvas.removeEventListener('click', handleCanvasClick);
+    };
+  }, []);
+
+  // Draw canvas world and avatars using requestAnimationFrame
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const context = canvas.getContext('2d');
+    let animationFrameId;
 
-    context.clearRect(0, 0, canvas.width, canvas.height);
+    const draw = () => {
+      context.clearRect(0, 0, canvas.width, canvas.height);
 
-    context.fillStyle = '#f3f6fb';
-    context.fillRect(0, 0, canvas.width, canvas.height);
+      context.fillStyle = '#f3f6fb';
+      context.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Draw grid
-    context.strokeStyle = '#dce3ed';
-    context.lineWidth = 1;
+      // Draw grid
+      context.strokeStyle = '#dce3ed';
+      context.lineWidth = 1;
 
-    for (let x = 0; x <= canvas.width; x += 40) {
-      context.beginPath();
-      context.moveTo(x, 0);
-      context.lineTo(x, canvas.height);
-      context.stroke();
-    }
+      for (let x = 0; x <= canvas.width; x += 40) {
+        context.beginPath();
+        context.moveTo(x, 0);
+        context.lineTo(x, canvas.height);
+        context.stroke();
+      }
 
-    for (let y = 0; y <= canvas.height; y += 40) {
-      context.beginPath();
-      context.moveTo(0, y);
-      context.lineTo(canvas.width, y);
-      context.stroke();
-    }
-     // Draw walls
-    context.fillStyle = '#64748b';
+      for (let y = 0; y <= canvas.height; y += 40) {
+        context.beginPath();
+        context.moveTo(0, y);
+        context.lineTo(canvas.width, y);
+        context.stroke();
+      }
 
-    // Wall 1
-    context.fillRect(200, 150, 150, 15);
+      // Draw walls
+      context.fillStyle = '#64748b';
+      walls.forEach((wall) => {
+        context.fillRect(wall.x, wall.y, wall.width, wall.height);
+      });
 
-    // Wall 2
-    context.fillRect(450, 250, 15, 120);
+      // Draw 100px earshot circle
+      const myAvatar = avatars[avatarIdRef.current];
 
-    // Wall 3
-    context.fillRect(550, 100, 120, 15);
-    // Draw 100px earshot circle around your avatar
-const myAvatar = avatars[avatarIdRef.current];
+      if (myAvatar) {
+        context.beginPath();
+        context.arc(myAvatar.x, myAvatar.y, 100, 0, Math.PI * 2);
+        context.strokeStyle = 'rgba(22, 163, 74, 0.5)';
+        context.lineWidth = 2;
+        context.stroke();
+      }
 
-if (myAvatar) {
-  context.beginPath();
-  context.arc(myAvatar.x, myAvatar.y, 100, 0, Math.PI * 2);
-  context.strokeStyle = 'rgba(22, 163, 74, 0.5)';
-  context.lineWidth = 2;
-  context.stroke();
-}
-    // Draw avatars
-    // Draw avatars
+      // Draw avatars
+      Object.entries(avatars).forEach(([id, avatar]) => {
+        const isMine = id === avatarIdRef.current;
 
+        const distance = myAvatar
+          ? Math.sqrt(
+              (avatar.x - myAvatar.x) ** 2 +
+              (avatar.y - myAvatar.y) ** 2
+            )
+          : Infinity;
 
-Object.entries(avatars).forEach(([id, avatar]) => {
-  const isMine = id === avatarIdRef.current;
+        const isNearby = !isMine && distance <= 100;
 
-  const distance = myAvatar
-    ? Math.sqrt(
-        (avatar.x - myAvatar.x) ** 2 +
-        (avatar.y - myAvatar.y) ** 2
-      )
-    : Infinity;
+        // Microphone indicator
+        if (isMine && micEnabled) {
+          context.beginPath();
+          context.arc(avatar.x, avatar.y, 17, 0, Math.PI * 2);
+          context.strokeStyle = '#f59e0b';
+          context.lineWidth = 3;
+          context.stroke();
+        }
 
-  const isNearby = !isMine && distance <= 100;
-// Speaking indicator ring
-if (isMine && micEnabled) {
-  context.beginPath();
-  context.arc(avatar.x, avatar.y, 17, 0, Math.PI * 2);
-  context.strokeStyle = '#f59e0b';
-  context.lineWidth = 3;
-  context.stroke();
-}
+        context.beginPath();
+        context.arc(avatar.x, avatar.y, 12, 0, Math.PI * 2);
 
-  context.beginPath();
-  context.arc(avatar.x, avatar.y, 12, 0, Math.PI * 2);
+        context.fillStyle = isMine
+          ? '#16a34a'
+          : isNearby
+            ? '#16a34a'
+            : '#2563eb';
 
-  context.fillStyle = isMine
-    ? '#16a34a'
-    : isNearby
-      ? '#16a34a'
-      : '#2563eb';
+        context.fill();
 
-  context.fill();
+        context.fillStyle = '#111827';
+        context.font = '12px Arial';
+        context.textAlign = 'center';
+        context.fillText(isMine ? 'You' : 'Avatar', avatar.x, avatar.y + 27);
+      });
 
-  context.fillStyle = '#111827';
-  context.font = '12px Arial';
-  context.textAlign = 'center';
+      animationFrameId = requestAnimationFrame(draw);
+    };
 
-  context.fillText(
-    isMine ? 'You' : 'Avatar',
-    avatar.x,
-    avatar.y + 27
-  );
-});
- }, [avatars, micEnabled]);
+    animationFrameId = requestAnimationFrame(draw);
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, [avatars, micEnabled]);
 
   const myPosition = avatars[avatarIdRef.current] || positionRef.current;
-  const nearbyUsers = Object.entries(avatars)
-  .filter(([id, avatar]) => {
-    if (id === avatarIdRef.current) return false;
+  const nearbyUsers = Object.entries(avatars).filter(([id, avatar]) => {
+  if (id === avatarIdRef.current) return false;
 
-    const distance = Math.sqrt(
-      (avatar.x - myPosition.x) ** 2 +
-      (avatar.y - myPosition.y) ** 2
-    );
-
-    return distance <= 100;
-  });
+  return isWithinRange(
+    myPosition.x,
+    myPosition.y,
+    avatar.x,
+    avatar.y,
+    100
+  );
+});
   const toggleMic = async () => {
   if (micEnabled) {
     if (localStreamRef.current) {
