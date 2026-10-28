@@ -265,21 +265,43 @@ const localStreamRef = useRef(null);
         context.fillRect(wall.x, wall.y, wall.width, wall.height);
       });
 
-      // Draw 100px earshot circle
-      const myAvatar = avatars[avatarIdRef.current];
+      // Get my avatar first
+const myAvatar = avatars[avatarIdRef.current];
 
-      if (myAvatar) {
-        context.beginPath();
-        context.arc(myAvatar.x, myAvatar.y, 100, 0, Math.PI * 2);
-        context.strokeStyle = 'rgba(22, 163, 74, 0.5)';
-        context.lineWidth = 2;
-        context.stroke();
-      }
+// Draw 100px earshot circle
+if (myAvatar) {
+  context.beginPath();
+  context.arc(myAvatar.x, myAvatar.y, 100, 0, Math.PI * 2);
+  context.strokeStyle = 'rgba(22, 163, 74, 0.5)';
+  context.lineWidth = 2;
+  context.stroke();
+}
+
+const nearbyDistances = myAvatar
+  ? Object.entries(avatars)
+      .filter(([id]) => id !== avatarIdRef.current)
+      .map(([, avatar]) =>
+        getDistance(
+          myAvatar.x,
+          myAvatar.y,
+          avatar.x,
+          avatar.y
+        )
+      )
+      .filter((distance) => distance <= 100)
+  : [];
+
+const closestDistance =
+  nearbyDistances.length > 0
+    ? Math.min(...nearbyDistances)
+    : null;
 
       // Draw avatars
       Object.entries(avatars).forEach(([id, avatar]) => {
-        const isMine = id === avatarIdRef.current;
+        
 
+        const isMine = id === avatarIdRef.current;
+        
         const distance = myAvatar
           ? Math.sqrt(
               (avatar.x - myAvatar.x) ** 2 +
@@ -288,6 +310,24 @@ const localStreamRef = useRef(null);
           : Infinity;
 
         const isNearby = !isMine && distance <= 100;
+
+        // Volume ring based on distance
+if (isMine && closestDistance !== null) {
+  const ringRadius =
+    12 + ((100 - closestDistance) / 100) * 18;
+
+  context.beginPath();
+  context.arc(
+    avatar.x,
+    avatar.y,
+    ringRadius,
+    0,
+    Math.PI * 2
+  );
+  context.strokeStyle = 'rgba(139, 92, 246, 0.8)';
+  context.lineWidth = 3;
+  context.stroke();
+}
 
         // Microphone indicator
         if (isMine && micEnabled) {
