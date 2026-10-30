@@ -28,7 +28,9 @@ function App() {
   const [avatars, setAvatars] = useState({});
   const [connected, setConnected] = useState(false);
   const [micEnabled, setMicEnabled] = useState(false);
+  const [smoothVolumes, setSmoothVolumes] = useState({});
 const localStreamRef = useRef(null);
+
 
   // Connect to WebSocket server
   useEffect(() => {
@@ -390,9 +392,50 @@ const peerDebugInfo = nearbyUsers.map(([id, avatar]) => {
   return {
     id,
     distance: Math.round(distance),
-    volume: volume.toFixed(2)
+    volume: (smoothVolumes[id] ?? volume).toFixed(2)
   };
 });
+// Smooth gain ramps in UI
+useEffect(() => {
+  let animationFrameId;
+
+  const animateVolume = () => {
+    setSmoothVolumes((previous) => {
+      const updated = {};
+
+      Object.entries(avatars).forEach(([id, avatar]) => {
+        if (id === avatarIdRef.current) return;
+
+        const myAvatar = avatars[avatarIdRef.current];
+
+        if (!myAvatar) return;
+
+        const distance = getDistance(
+          myAvatar.x,
+          myAvatar.y,
+          avatar.x,
+          avatar.y
+        );
+
+        const targetVolume = Math.max(0, 1 - distance / 100);
+        const currentVolume = previous[id] ?? 0;
+
+        updated[id] =
+          currentVolume + (targetVolume - currentVolume) * 0.12;
+      });
+
+      return updated;
+    });
+
+    animationFrameId = requestAnimationFrame(animateVolume);
+  };
+
+  animationFrameId = requestAnimationFrame(animateVolume);
+
+  return () => {
+    cancelAnimationFrame(animationFrameId);
+  };
+}, [avatars]);
   const toggleMic = async () => {
   if (micEnabled) {
     if (localStreamRef.current) {
