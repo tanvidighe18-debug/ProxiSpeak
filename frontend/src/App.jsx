@@ -377,6 +377,22 @@ if (isMine && closestDistance !== null) {
     100
   );
 });
+const peerDebugInfo = nearbyUsers.map(([id, avatar]) => {
+  const distance = getDistance(
+    myPosition.x,
+    myPosition.y,
+    avatar.x,
+    avatar.y
+  );
+
+  const volume = Math.max(0, 1 - distance / 100);
+
+  return {
+    id,
+    distance: Math.round(distance),
+    volume: volume.toFixed(2)
+  };
+});
   const toggleMic = async () => {
   if (micEnabled) {
     if (localStreamRef.current) {
@@ -419,6 +435,21 @@ if (isMine && closestDistance !== null) {
         X: {myPosition.x} | Y: {myPosition.y}
       </p>
       <h3>Users in Earshot (100px)</h3>
+      <h3>Debug Overlay (Distance & Volume)</h3>
+
+{peerDebugInfo.length === 0 ? (
+  <p>No peers available for debugging</p>
+) : (
+  <ul>
+    {peerDebugInfo.map((peer) => (
+      <li key={peer.id}>
+        Avatar {peer.id} |
+        Distance: {peer.distance}px |
+        Volume: {peer.volume}
+      </li>
+    ))}
+  </ul>
+)}
 
 {nearbyUsers.length === 0 ? (
   <p>No users nearby</p>
