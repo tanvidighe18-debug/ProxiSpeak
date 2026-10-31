@@ -395,6 +395,15 @@ const peerDebugInfo = nearbyUsers.map(([id, avatar]) => {
     volume: (smoothVolumes[id] ?? volume).toFixed(2)
   };
 });
+// Connected and capped peer indicators
+const connectedPeers = Object.entries(avatars).filter(
+  ([id]) => id !== avatarIdRef.current
+);
+
+const connectedPeerCount = connectedPeers.length;
+
+// Capped peers will be identified when mesh cap data is available
+const cappedPeerCount = 0;
 // Smooth gain ramps in UI
 useEffect(() => {
   let animationFrameId;
@@ -478,6 +487,15 @@ useEffect(() => {
         X: {myPosition.x} | Y: {myPosition.y}
       </p>
       <h3>Users in Earshot (100px)</h3>
+      <h3>Peer Connection Status</h3>
+
+<p style={{ color: 'green' }}>
+  🟢 Connected Peers: {connectedPeerCount}
+</p>
+
+<p style={{ color: 'orange' }}>
+  🟠 Capped Peers: {cappedPeerCount}
+</p>
       <h3>Debug Overlay (Distance & Volume)</h3>
 
 {peerDebugInfo.length === 0 ? (
