@@ -28,6 +28,7 @@ function App() {
   const [avatars, setAvatars] = useState({});
   const [connected, setConnected] = useState(false);
   const [micEnabled, setMicEnabled] = useState(false);
+  const [fps, setFps] = useState(0);
   const [smoothVolumes, setSmoothVolumes] = useState({});
 const localStreamRef = useRef(null);
 
@@ -230,6 +231,8 @@ const localStreamRef = useRef(null);
   }, []);
 
   // Draw canvas world and avatars using requestAnimationFrame
+  let frameCount = 0;
+let lastFpsTime = performance.now();
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -238,6 +241,18 @@ const localStreamRef = useRef(null);
     let animationFrameId;
 
     const draw = () => {
+      frameCount++;
+
+const now = performance.now();
+
+if (now - lastFpsTime >= 1000) {
+  setFps(
+    Math.round((frameCount * 1000) / (now - lastFpsTime))
+  );
+
+  frameCount = 0;
+  lastFpsTime = now;
+}
       context.clearRect(0, 0, canvas.width, canvas.height);
 
       context.fillStyle = '#f3f6fb';
@@ -477,6 +492,7 @@ useEffect(() => {
 </button>
 
       <p>
+        <p>FPS: {fps}</p>
         Server status:{' '}
         <strong style={{ color: connected ? 'green' : 'red' }}>
           {connected ? 'Connected' : 'Connecting...'}
