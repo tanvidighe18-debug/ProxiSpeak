@@ -26,6 +26,9 @@ function App() {
   const avatarIdRef = useRef(null);
 
   const [avatars, setAvatars] = useState({});
+  const [obstacles, setObstacles] = useState([]);
+const [obstacleMode, setObstacleMode] = useState('move');
+
   const [connected, setConnected] = useState(false);
   const [micEnabled, setMicEnabled] = useState(false);
   const [fps, setFps] = useState(0);
@@ -120,23 +123,39 @@ const localStreamRef = useRef(null);
       const radius = 12;
 
       const hitWall = walls.some((wall) => {
-        const closestX = Math.max(
-          wall.x,
-          Math.min(nextPosition.x, wall.x + wall.width)
-        );
-        const closestY = Math.max(
-          wall.y,
-          Math.min(nextPosition.y, wall.y + wall.height)
-        );
+  const closestX = Math.max(
+    wall.x,
+    Math.min(nextPosition.x, wall.x + wall.width)
+  );
+  const closestY = Math.max(
+    wall.y,
+    Math.min(nextPosition.y, wall.y + wall.height)
+  );
 
-        const dx = nextPosition.x - closestX;
-        const dy = nextPosition.y - closestY;
+  const dx = nextPosition.x - closestX;
+  const dy = nextPosition.y - closestY;
 
-        return dx * dx + dy * dy < radius * radius;
-      });
+  return dx * dx + dy * dy < radius * radius;
+});
 
-      if (hitWall) return;
+const hitFurniture = obstacles.some((obstacle) => {
+  const closestX = Math.max(
+    obstacle.x,
+    Math.min(nextPosition.x, obstacle.x + obstacle.width)
+  );
 
+  const closestY = Math.max(
+    obstacle.y,
+    Math.min(nextPosition.y, obstacle.y + obstacle.height)
+  );
+
+  const dx = nextPosition.x - closestX;
+  const dy = nextPosition.y - closestY;
+
+  return dx * dx + dy * dy < radius * radius;
+});
+
+if (hitWall || hitFurniture) return;
       positionRef.current = nextPosition;
 
       const id = avatarIdRef.current;
@@ -176,26 +195,71 @@ const localStreamRef = useRef(null);
       const targetX = (event.clientX - rect.left) * (canvas.width / rect.width);
       const targetY = (event.clientY - rect.top) * (canvas.height / rect.height);
 
+      if (obstacleMode === 'add') {
+  setObstacles((previous) => [
+    ...previous,
+    {
+      x: targetX - 25,
+      y: targetY - 15,
+      width: 50,
+      height: 30
+    }
+  ]);
+  return;
+}
+
+if (obstacleMode === 'remove') {
+  setObstacles((previous) => {
+    const index = previous.findIndex((obstacle) =>
+      targetX >= obstacle.x &&
+      targetX <= obstacle.x + obstacle.width &&
+      targetY >= obstacle.y &&
+      targetY <= obstacle.y + obstacle.height
+    );
+
+    if (index === -1) return previous;
+
+    return previous.filter((_, i) => i !== index);
+  });
+  return;
+}
+
       const radius = 12;
 
       const hitWall = walls.some((wall) => {
-        const closestX = Math.max(
-          wall.x,
-          Math.min(targetX, wall.x + wall.width)
-        );
-        const closestY = Math.max(
-          wall.y,
-          Math.min(targetY, wall.y + wall.height)
-        );
+  const closestX = Math.max(
+    wall.x,
+    Math.min(targetX, wall.x + wall.width)
+  );
+  const closestY = Math.max(
+    wall.y,
+    Math.min(targetY, wall.y + wall.height)
+  );
 
-        const dx = targetX - closestX;
-        const dy = targetY - closestY;
+  const dx = targetX - closestX;
+  const dy = targetY - closestY;
 
-        return dx * dx + dy * dy < radius * radius;
-      });
+  return dx * dx + dy * dy < radius * radius;
+});
 
-      if (hitWall) return;
+const hitFurniture = obstacles.some((obstacle) => {
+  const closestX = Math.max(
+    obstacle.x,
+    Math.min(targetX, obstacle.x + obstacle.width)
+  );
 
+  const closestY = Math.max(
+    obstacle.y,
+    Math.min(targetY, obstacle.y + obstacle.height)
+  );
+
+  const dx = targetX - closestX;
+  const dy = targetY - closestY;
+
+  return dx * dx + dy * dy < radius * radius;
+});
+
+if (hitWall || hitFurniture) return;
       const nextPosition = {
         x: Math.max(15, Math.min(785, targetX)),
         y: Math.max(15, Math.min(485, targetY))
@@ -281,6 +345,17 @@ if (now - lastFpsTime >= 1000) {
       walls.forEach((wall) => {
         context.fillRect(wall.x, wall.y, wall.width, wall.height);
       });
+      // Draw furniture obstacles
+context.fillStyle = '#a16207';
+
+obstacles.forEach((obstacle) => {
+  context.fillRect(
+    obstacle.x,
+    obstacle.y,
+    obstacle.width,
+    obstacle.height
+  );
+});
 
       // Get my avatar first
 const myAvatar = avatars[avatarIdRef.current];
@@ -380,7 +455,7 @@ if (isMine && closestDistance !== null) {
     return () => {
       cancelAnimationFrame(animationFrameId);
     };
-  }, [avatars, micEnabled]);
+  }, [avatars, micEnabled, obstacles]);
 
   const myPosition = avatars[avatarIdRef.current] || positionRef.current;
   const nearbyUsers = Object.entries(avatars).filter(([id, avatar]) => {
@@ -487,6 +562,17 @@ useEffect(() => {
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
       <h1>ProxiSpeak</h1>
+      <button onClick={() => setObstacleMode('add')}>
+  Add Furniture
+</button>
+
+<button onClick={() => setObstacleMode('remove')}>
+  Remove Furniture
+</button>
+
+<button onClick={() => setObstacleMode('move')}>
+  Move Avatar
+</button>
       <button onClick={toggleMic}>
   {micEnabled ? 'Mute Microphone' : 'Enable Microphone'}
 </button>
