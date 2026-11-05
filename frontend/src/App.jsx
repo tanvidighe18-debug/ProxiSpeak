@@ -21,6 +21,7 @@ function App() {
   { x: 550, y: 100, width: 120, height: 15 }
 ];
   const canvasRef = useRef(null);
+  const staticCanvasRef = useRef(null);
   const  socketRef = useRef(null);
   const positionRef = useRef({ x: 100, y: 100 });
   const avatarIdRef = useRef(null);
@@ -317,6 +318,65 @@ if (hitWall || hitFurniture) return;
     };
   }, [obstacleMode, obstacles]);
 
+  // Static Layer Cache
+useEffect(() => {
+  const staticCanvas = document.createElement('canvas');
+
+  staticCanvas.width = 800;
+  staticCanvas.height = 500;
+
+  const staticContext = staticCanvas.getContext('2d');
+
+  // Background
+  staticContext.fillStyle = '#f3f6fb';
+  staticContext.fillRect(0, 0, 800, 500);
+
+  // Grid
+  staticContext.strokeStyle = '#dce3ed';
+  staticContext.lineWidth = 1;
+
+  for (let x = 0; x <= 800; x += 40) {
+    staticContext.beginPath();
+    staticContext.moveTo(x, 0);
+    staticContext.lineTo(x, 500);
+    staticContext.stroke();
+  }
+
+  for (let y = 0; y <= 500; y += 40) {
+    staticContext.beginPath();
+    staticContext.moveTo(0, y);
+    staticContext.lineTo(800, y);
+    staticContext.stroke();
+  }
+
+  // Walls
+  staticContext.fillStyle = '#64748b';
+
+  walls.forEach((wall) => {
+    staticContext.fillRect(
+      wall.x,
+      wall.y,
+      wall.width,
+      wall.height
+    );
+  });
+
+  // Furniture
+  staticContext.fillStyle = '#a16207';
+
+  obstacles.forEach((obstacle) => {
+    staticContext.fillRect(
+      obstacle.x,
+      obstacle.y,
+      obstacle.width,
+      obstacle.height
+    );
+  });
+
+  staticCanvasRef.current = staticCanvas;
+
+}, [obstacles]);
+
   // Draw canvas world and avatars using requestAnimationFrame
   let frameCount = 0;
 let lastFpsTime = performance.now();
@@ -340,45 +400,12 @@ if (now - lastFpsTime >= 1000) {
   frameCount = 0;
   lastFpsTime = now;
 }
-      context.clearRect(0, 0, canvas.width, canvas.height);
+      // Draw cached static layer
+context.clearRect(0, 0, canvas.width, canvas.height);
 
-      context.fillStyle = '#f3f6fb';
-      context.fillRect(0, 0, canvas.width, canvas.height);
-
-      // Draw grid
-      context.strokeStyle = '#dce3ed';
-      context.lineWidth = 1;
-
-      for (let x = 0; x <= canvas.width; x += 40) {
-        context.beginPath();
-        context.moveTo(x, 0);
-        context.lineTo(x, canvas.height);
-        context.stroke();
-      }
-
-      for (let y = 0; y <= canvas.height; y += 40) {
-        context.beginPath();
-        context.moveTo(0, y);
-        context.lineTo(canvas.width, y);
-        context.stroke();
-      }
-
-      // Draw walls
-      context.fillStyle = '#64748b';
-      walls.forEach((wall) => {
-        context.fillRect(wall.x, wall.y, wall.width, wall.height);
-      });
-      // Draw furniture obstacles
-context.fillStyle = '#a16207';
-
-obstacles.forEach((obstacle) => {
-  context.fillRect(
-    obstacle.x,
-    obstacle.y,
-    obstacle.width,
-    obstacle.height
-  );
-});
+if (staticCanvasRef.current) {
+  context.drawImage(staticCanvasRef.current, 0, 0);
+}
 
       // Get my avatar first
 const myAvatar = avatars[avatarIdRef.current];
