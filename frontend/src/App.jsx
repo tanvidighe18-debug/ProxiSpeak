@@ -27,6 +27,29 @@ function App() {
 
   const [avatars, setAvatars] = useState({});
   const [obstacles, setObstacles] = useState([]);
+  useEffect(() => {
+  setObstacles([
+    { x: 200, y: 200, width: 50, height: 30 },
+    { x: 350, y: 150, width: 50, height: 30 }
+  ]);
+}, []);
+  // Load obstacles from API
+useEffect(() => {
+  fetch('http://localhost:3001/api/obstacles')
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error('API request failed');
+      }
+      return response.json();
+    })
+    .then((data) => {
+      console.log('API obstacles:', data);
+      setObstacles(data);
+    })
+    .catch((error) => {
+      console.error('Obstacle loading failed:', error);
+    });
+}, []);
 const [obstacleMode, setObstacleMode] = useState('move');
 
   const [connected, setConnected] = useState(false);
@@ -292,7 +315,7 @@ if (hitWall || hitFurniture) return;
     return () => {
       canvas.removeEventListener('click', handleCanvasClick);
     };
-  }, []);
+  }, [obstacleMode, obstacles]);
 
   // Draw canvas world and avatars using requestAnimationFrame
   let frameCount = 0;
